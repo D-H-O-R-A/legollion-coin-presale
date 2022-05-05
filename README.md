@@ -7,3 +7,5 @@ When the administrator starts the pre-sale, the user can make the purchase of th
 Example: https://waves-dapp.com/3Mw7mAf2p8drjeSSDEbq6yyFhjqTgDcwGFB
 
 Mainnet: https://waves-dapp.com/3PAoJCcSedZD6WTkgh6t9fGQYXvRABNxb43
+
+Website: https://legollioncoin.tech/presale
