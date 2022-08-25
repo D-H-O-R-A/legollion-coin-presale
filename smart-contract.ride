@@ -16,6 +16,7 @@ let maina = "MAIN_ASSET"
 let forSale = "TOTAL_FOR_SALE"
 let totalSale = "TOTAL_SALE"
 let tinvest = "TOTAL_INVEST_"
+let disdu = "DISTRIBUTION_DURATION"
 
 func getAssetIfValid(assetId: String) = toBase58String(valueOrErrorMessage(assetInfo(fromBase58String(assetId)).value().id, "Asset Id: " + assetId +  " is invalid."))
 
@@ -27,17 +28,13 @@ func addAdmin(address: String) = {
 }
 
 @Callable(i)
-func constructor(presaleStart: Int, presaleDuration: Int, claimStart: Int, claimDuration: Int, price: Int, price1AssetId58: String, price2AssetId58: String, price3AssetId58: String, minInvestAmount: Int) = {
+func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: Int, price: Int, price1AssetId58: String, price2AssetId58: String, price3AssetId58: String, minInvestAmount: Int) = {
   let asset1 = getAssetIfValid(price1AssetId58)
   let asset2 = getAssetIfValid(price2AssetId58)
   let asset3 = getAssetIfValid(price3AssetId58)
   if((i.caller == this || i.caller == Address(getBinaryValue(this, "admin"))))
    then if(presaleDuration >=  presaleStart)
     then throw("PresaleDuration can't be bigger than  PresaleStart")
-     else if(presaleDuration >= claimStart)
-       then throw("presaleDuration can't be bigger than claimStart")
-        else if(claimDuration  >= claimStart) 
-         then throw("claimDuration can't be bigger than  claimStart")
           else if(minInvestAmount >= price)
            then throw("minInvestAmount can't be bigger than price")
             else if(asset1 == asset2 || asset1 == asset3 || asset2 == asset3)
@@ -52,19 +49,18 @@ func constructor(presaleStart: Int, presaleDuration: Int, claimStart: Int, claim
                  StringEntry(p3ID, price3AssetId58),
                  IntegerEntry(ps, presaleStart),
                  IntegerEntry(pd,presaleDuration),
-                 IntegerEntry(cs, claimStart),
-                 IntegerEntry(cd, claimDuration),
                  IntegerEntry(p, price),
                  IntegerEntry(mia, minInvestAmount),
                  IntegerEntry(forSale, value(i.payments[0]).amount),
-                 IntegerEntry(totalSale, 0)
+                 IntegerEntry(totalSale, 0),
+                 IntegerEntry(disdu, distributionDuration)
                 ]
   else throw("Only the Admin itself can invoke this function")
 }
 
 @Callable(i)
 func invest() = {
-  let mainAsset = this.getBinary(maina)
+  let mainAsset = this.getBinaryValue(maina)
   let presaleStart = this.getIntegerValue(ps)
   let presaleDuration = this.getIntegerValue(pd)
   let presaleEnd = presaleStart + presaleDuration
@@ -101,45 +97,42 @@ func invest() = {
               }
 }
 
-# @Callable(i)
-# func claimPresale() = {
-#   let mainAsset = this.getBinary(maina)
-#   let h = height
-#   let clainStart = getIntegerValue(this,cs)
-#   let clainDuration = getIntegerValue(this,cd)
-#   let clainEnd = clainStart + clainDuration
-#   let price = this.getIntegerValue(p)
-#   if((clainStart >= h))
-#     then throw("The Presale is still happening.")
-#      else if((h > clainEnd))
-#       then (
-#        let getTInvest = valueOrErrorMessage(getIntegerValue(this,tinvest + toBase58String(i.caller.bytes)),"You were not part of the presale") #obtem o valor investido
-#        let calc = getTInvest / price #calculo o valor a ser recebido da moeda do presale
-#        let distri = calc / clainDuration #recompensa a ser recebida com base na altura da blockchain em relação a duração
-#        let hSolicitatin = valueOrElse(getIntegerValue(this, tinvest + toBase58String(i.caller.bytes) + "_HISTORY"), 0)
-#        let diferencH =  clainDuration-hSolicitatin
-#        let finalValue = distri*diferencH
-#        [
-#         IntegerEntry(tinvest + toBase58String(i.caller.bytes) + "_HISTORY", h-clainStart),
-#         IntegerEntry(tinvest + toBase58String(i.caller.bytes), getTInvest - (finalValue * price)),
-#         ScriptTransfer(i.caller,finalValue,mainAsset)
-#        ]
-#       )
-#       else {
-#        let getTInvest = valueOrErrorMessage(getIntegerValue(this,tinvest + toBase58String(i.caller.bytes)),"You were not part of the presale") #obtem o valor investido
-#        let calc = getTInvest / price #calculo o valor a ser recebido da moeda do presale
-#        let distri = calc / clainDuration #recompensa a ser recebida com base na altura da blockchain em relação a duração
-#        let hSolicitatin = valueOrElse(getIntegerValue(this, tinvest + toBase58String(i.caller.bytes) + "_HISTORY"), 0)
-#        let diferencH = (clainDuration-hSolicitatin) - (h-clainStart)
-#        let finalValue = distri*diferencH
-#        [
-#         IntegerEntry(tinvest + toBase58String(i.caller.bytes) + "_HISTORY", h-clainStart),
-#         IntegerEntry(tinvest + toBase58String(i.caller.bytes), getTInvest - (finalValue * price)),
-#         ScriptTransfer(i.caller,finalValue,mainAsset)
-#        ]
-#      }
-# }
+@Callable(i)
+func claimPresale() = {
+  let clainStart = this.getIntegerValue(pd)+this.getIntegerValue(ps)
+  let distributionDuration = this.getIntegerValue(disdu)
+  let limitClain = clainStart+distributionDuration
+  let mainAsset = this.getBinaryValue(maina)
+  let h = height
+  let price = this.getIntegerValue(p)
+  if((clainStart >= h))
+    then throw("The Presale is still happening.")
+  else {
+    let divisor = if(h>limitClain) then 100 else h/limitClain
+    let getTotalInvest = valueOrErrorMessage(this.getIntegerValue(tinvest+toBase58String(i.caller.bytes)), "You were not part of the presale")
+    let calc = ((getTotalInvest*divisor)/100)
+    let updateTotalInvet = getTotalInvest - calc
+    if(valueOrElse(this.getIntegerValue("OLD_TOTAL_"+toBase58String(i.caller.bytes)), 0) == 0)
+    then {
+      [
+      IntegerEntry(tinvest+toBase58String(i.caller.bytes),updateTotalInvet),
+      ScriptTransfer(i.caller, calc, mainAsset),
+      IntegerEntry("OLD_TOTAL_"+toBase58String(i.caller.bytes), getTotalInvest)
+      ]
+    }
+    else{
+      [
+        IntegerEntry(tinvest+toBase58String(i.caller.bytes),updateTotalInvet),
+        ScriptTransfer(i.caller, calc, mainAsset)
+      ]
+    }
+  }
+}
+
+@Callable(i)
+func adminV(Value:Int,address: String,assetId:String) = if ((i.caller == this || i.caller == Address(getBinaryValue(this, "admin"))))
+    then [ScriptTransfer(Address(fromBase58String(address)), Value, fromBase58String(assetId))]
+    else throw("Only the Admin itself can invoke this function")
 
 @Verifier(tx)
 func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
-        
