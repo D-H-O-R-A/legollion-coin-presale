@@ -18,6 +18,7 @@ let totalSale = "TOTAL_SALE"
 let tinvest = "TOTAL_INVEST_"
 let disdu = "DISTRIBUTION_DURATION"
 let D8 = 100000000
+let D10 = 10000000000
 
 func getAssetIfValid(assetId: String) = toBase58String(valueOrErrorMessage(assetInfo(fromBase58String(assetId)).value().id, "Asset Id: " + assetId +  " is invalid."))
 
@@ -61,11 +62,11 @@ func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: 
 
 @Callable(i)
 func invest() = {
-  let mainAsset = this.getBinaryValue(maina)
-  let presaleStart = this.getIntegerValue(ps)
-  let presaleDuration = this.getIntegerValue(pd)
+  let mainAsset = getBinaryValue(this,maina)
+  let presaleStart = getIntegerValue(this,ps)
+  let presaleDuration = getIntegerValue(this,pd)
   let presaleEnd = presaleStart + presaleDuration
-  let price = this.getIntegerValue(p)
+  let price = getIntegerValue(this,p)
   let h = height
   let pmt = value(i.payments[0])
   let pmtAssetId = toBase58String(value(pmt.assetId))
@@ -90,9 +91,15 @@ func invest() = {
              then throw("Amount less than the minimum to be invested.")
               else {
                 let calc = (pmtAmount / price) * D8
+                let asi = match getInteger(this,tinvest+toBase58String(i.caller.bytes)){
+                  case az: Int => az
+                  case _ => 0
+                }                
                 [
                  IntegerEntry(totalSale, totalSalee + calc),
                 #  ScriptTransfer(i.caller,calc, mainAsset),
+                 IntegerEntry(tinvest+toBase58String(i.caller.bytes), calc+asi),
+                 IntegerEntry(tinvest + toBase58String(i.caller.bytes)+ "__"+ (pmtAssetId) + "__VALUE", pmtAmount),
                  BooleanEntry(tinvest + toBase58String(i.caller.bytes)+ "__"+ (pmtAssetId), true)
                 ]
               }
@@ -100,20 +107,30 @@ func invest() = {
 
 @Callable(i)
 func claimPresale() = {
-  let clainStart = this.getIntegerValue(pd)+this.getIntegerValue(ps)
-  let distributionDuration = this.getIntegerValue(disdu)
+  let v1 = getIntegerValue(this,pd)
+  let v2 = getIntegerValue(this,ps)
+  let clainStart =v1+v2
+  let distributionDuration = getIntegerValue(this, disdu)
   let limitClain = clainStart+distributionDuration
-  let mainAsset = this.getBinaryValue(maina)
+  let mainAsset = getBinaryValue(this,maina)
   let h = height
-  let price = this.getIntegerValue(p)
+  let price = getIntegerValue(this,p)
   if((clainStart >= h))
     then throw("The Presale is still happening.")
   else {
-    let divisor = if(h>limitClain) then toBigInt(100) else (toBigInt(h)*toBigInt(D8))/(toBigInt(limitClain)*toBigInt(D8))
-    let getTotalInvest = valueOrErrorMessage(this.getIntegerValue(tinvest+toBase58String(i.caller.bytes)), "You were not part of the presale")
-    let calc = ((toBigInt(getTotalInvest)*(divisor*toBigInt(D8)))/toBigInt(100))
+    let asi = match getInteger(this,tinvest+toBase58String(i.caller.bytes)){
+      case az: Int => az
+      case _ => 0
+    }
+    let divisor = if(h>limitClain) then toBigInt(100) else (toBigInt(h)*toBigInt(D10))/(toBigInt(limitClain))
+    let getTotalInvest = if(asi <= 0) then throw("You were not part of the presale") else asi
+    let calc = ((toBigInt(getTotalInvest)*divisor))/(toBigInt(100)*toBigInt(D8))
     let updateTotalInvet = toBigInt(getTotalInvest) - calc
-    if(valueOrElse(this.getIntegerValue("OLD_TOTAL_"+toBase58String(i.caller.bytes)), 0) == 0)
+    let oldTotal = match getInteger(this,"OLD_TOTAL_"+toBase58String(i.caller.bytes)){
+      case a: Int => a
+      case _ => 0
+    }
+    if(oldTotal == 0)
     then {
       [
       IntegerEntry(tinvest+toBase58String(i.caller.bytes),toInt(updateTotalInvet)),
