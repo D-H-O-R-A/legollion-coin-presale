@@ -11,6 +11,7 @@ let p = "PRICE_IDO"
 let p1ID = "PRICE_1_ASSET_ID"
 let p2ID = "PRICE_2_ASSET_ID"
 let p3ID = "PRICE_3_ASSET_ID"
+let p4ID = "PRICE_4_ASSET_ID"
 let mia = "MIN_AMOUNT_INVEST"
 let maina = "MAIN_ASSET"
 let forSale = "TOTAL_FOR_SALE"
@@ -30,7 +31,7 @@ func addAdmin(address: String) = {
 }
 
 @Callable(i)
-func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: Int, price: Int, price1AssetId58: String, price2AssetId58: String, price3AssetId58: String, minInvestAmount: Int) = {
+func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: Int, price: Int, price1AssetId58: String, price2AssetId58: String, price3AssetId58: String,price4AssetId58:String,  minInvestAmount: Int) = {
   let asset1 = getAssetIfValid(price1AssetId58)
   let asset2 = getAssetIfValid(price2AssetId58)
   let asset3 = getAssetIfValid(price3AssetId58)
@@ -49,6 +50,7 @@ func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: 
                  StringEntry(p1ID, price1AssetId58),
                  StringEntry(p2ID, price2AssetId58),
                  StringEntry(p3ID, price3AssetId58),
+                 StringEntry(p4ID, price4AssetId58),
                  IntegerEntry(ps, presaleStart),
                  IntegerEntry(pd,presaleDuration),
                  IntegerEntry(p, price),
@@ -74,6 +76,7 @@ func invest() = {
   let asset1 = getStringValue(this,p1ID)
   let asset2 = getStringValue(this,p2ID)
   let asset3 = getStringValue(this,p3ID)
+  let asset4 = getStringValue(this, p4ID)
   let totalSalee = getIntegerValue(this,totalSale)
   let forSalee = getIntegerValue(this, forSale)
   let minInvest = getIntegerValue(this,mia)
@@ -83,7 +86,7 @@ func invest() = {
      then throw("presale has been already ended")
       else if((size(i.payments) != 1))
        then throw("exactly 1 payment is expected")
-        else if((pmtAssetId != asset1 && pmtAssetId != asset2 && pmtAssetId != asset3))
+        else if((pmtAssetId != asset1 && pmtAssetId != asset2 && pmtAssetId != asset3 && pmtAssetId != asset4))
          then throw("invalid payment asset id:" + (pmtAssetId) + " Expected:" + asset1)
           else if((totalSalee >= forSalee))
            then throw("Pre-sale asset has been - sold consider to use smaller payment")
