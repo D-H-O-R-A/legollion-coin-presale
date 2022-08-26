@@ -17,6 +17,7 @@ let forSale = "TOTAL_FOR_SALE"
 let totalSale = "TOTAL_SALE"
 let tinvest = "TOTAL_INVEST_"
 let disdu = "DISTRIBUTION_DURATION"
+let D8 = 100000000
 
 func getAssetIfValid(assetId: String) = toBase58String(valueOrErrorMessage(assetInfo(fromBase58String(assetId)).value().id, "Asset Id: " + assetId +  " is invalid."))
 
@@ -35,7 +36,7 @@ func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: 
   if((i.caller == this || i.caller == Address(getBinaryValue(this, "admin"))))
    then if(presaleDuration >=  presaleStart)
     then throw("PresaleDuration can't be bigger than  PresaleStart")
-          else if(minInvestAmount >= price)
+          else if(minInvestAmount > price)
            then throw("minInvestAmount can't be bigger than price")
             else if(asset1 == asset2 || asset1 == asset3 || asset2 == asset3)
              then throw("Each Asset must be different from the other.")
@@ -88,10 +89,10 @@ func invest() = {
             else if((minInvest > pmtAmount))
              then throw("Amount less than the minimum to be invested.")
               else {
-                let calc = (pmtAmount / price) * 100000000
+                let calc = (pmtAmount / price) * D8
                 [
                  IntegerEntry(totalSale, totalSalee + calc),
-                 ScriptTransfer(i.caller,calc, mainAsset),
+                #  ScriptTransfer(i.caller,calc, mainAsset),
                  BooleanEntry(tinvest + toBase58String(i.caller.bytes)+ "__"+ (pmtAssetId), true)
                 ]
               }
@@ -108,22 +109,22 @@ func claimPresale() = {
   if((clainStart >= h))
     then throw("The Presale is still happening.")
   else {
-    let divisor = if(h>limitClain) then 100 else h/limitClain
+    let divisor = if(h>limitClain) then toBigInt(100) else (toBigInt(h)*toBigInt(D8))/(toBigInt(limitClain)*toBigInt(D8))
     let getTotalInvest = valueOrErrorMessage(this.getIntegerValue(tinvest+toBase58String(i.caller.bytes)), "You were not part of the presale")
-    let calc = ((getTotalInvest*divisor)/100)
-    let updateTotalInvet = getTotalInvest - calc
+    let calc = ((toBigInt(getTotalInvest)*(divisor*toBigInt(D8)))/toBigInt(100))
+    let updateTotalInvet = toBigInt(getTotalInvest) - calc
     if(valueOrElse(this.getIntegerValue("OLD_TOTAL_"+toBase58String(i.caller.bytes)), 0) == 0)
     then {
       [
-      IntegerEntry(tinvest+toBase58String(i.caller.bytes),updateTotalInvet),
-      ScriptTransfer(i.caller, calc, mainAsset),
+      IntegerEntry(tinvest+toBase58String(i.caller.bytes),toInt(updateTotalInvet)),
+      ScriptTransfer(i.caller, toInt(calc), mainAsset),
       IntegerEntry("OLD_TOTAL_"+toBase58String(i.caller.bytes), getTotalInvest)
       ]
     }
     else{
       [
-        IntegerEntry(tinvest+toBase58String(i.caller.bytes),updateTotalInvet),
-        ScriptTransfer(i.caller, calc, mainAsset)
+        IntegerEntry(tinvest+toBase58String(i.caller.bytes),toInt(updateTotalInvet)),
+        ScriptTransfer(i.caller, toInt(calc), mainAsset)
       ]
     }
   }
