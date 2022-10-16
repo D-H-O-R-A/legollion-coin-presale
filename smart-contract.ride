@@ -35,18 +35,15 @@ func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: 
   let asset1 = getAssetIfValid(price1AssetId58)
   let asset2 = getAssetIfValid(price2AssetId58)
   let asset3 = getAssetIfValid(price3AssetId58)
-  if((i.caller == this || i.caller == Address(getBinaryValue(this, "admin"))))
+  if((i.caller == this || i.caller.bytes == getBinaryValue(this, "admin")))
    then if(presaleDuration >=  presaleStart)
     then throw("PresaleDuration can't be bigger than  PresaleStart")
           else if(minInvestAmount > price)
            then throw("minInvestAmount can't be bigger than price")
             else if(asset1 == asset2 || asset1 == asset3 || asset2 == asset3)
              then throw("Each Asset must be different from the other.")
-              else if((size(i.payments) != 1))
-                then throw("exactly 1 payment must be attached")
                 else              
                 [
-                 BinaryEntry(maina, value(i.payments[0].assetId)),
                  StringEntry(p1ID, price1AssetId58),
                  StringEntry(p2ID, price2AssetId58),
                  StringEntry(p3ID, price3AssetId58),
@@ -55,10 +52,18 @@ func constructor(presaleStart: Int, presaleDuration: Int, distributionDuration: 
                  IntegerEntry(pd,presaleDuration),
                  IntegerEntry(p, price),
                  IntegerEntry(mia, minInvestAmount),
-                 IntegerEntry(forSale, value(i.payments[0]).amount),
                  IntegerEntry(totalSale, 0),
                  IntegerEntry(disdu, distributionDuration)
                 ]
+  else throw("Only the Admin itself can invoke this function")
+}
+
+@Callable(i)
+func set() = {
+  if((i.caller == this || i.caller.bytes == getBinaryValue(this, "admin")))
+   then if((size(i.payments) != 1))
+    then throw("exactly 1 payment must be attached")
+   else [IntegerEntry(forSale, value(i.payments[0]).amount),BinaryEntry(maina, value(i.payments[0].assetId))]
   else throw("Only the Admin itself can invoke this function")
 }
 
